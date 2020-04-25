@@ -12,10 +12,10 @@ def main():
 		help="set the number of pixels per square")
 	parser.add_argument("-t", dest="THICC", action='store_const', default=True,
 		const=False, help="Make walls a single line thin")
+	parser.add_argument("-p", dest="PP", action='store_const', default=False,
+		const=True, help="Just pretty print json")
 	global args
 	args = parser.parse_args()
-
-	# prettyPrint(args.input)
 
 	readDPS(args.input)
 
@@ -23,7 +23,12 @@ def main():
 
 def readDPS(filename):
 	with open(filename) as file:
+		global data
 		data = json.loads("".join(file))
+
+	if args.PP:
+		prettyPrint(data)
+		exit(0)
 
 	# get edges of map
 	for objectTypes in data["tables"]:
@@ -35,18 +40,41 @@ def readDPS(filename):
 	global walls
 	walls = []
 	for layer in data["tables"]["Layer"]:
-		if isWall(layer):
-			out = [x for x in data["tables"]["Wall"] if x['id'] == layer["data"]]
-			if len(out) != 1:
-				raise Exception("A bad number of walls! "+str(len(out)))
+		if Wall.isWall(layer):
+			walls.append(Wall(findData(layer["data"], data["tables"]["Wall"])))
 
-			walls.append(Wall(out[0]))
+	global doors
+	doors = []
+	for layer in data["tables"]["Layer"]:
+		if Door.isDoor(layer):
+			doors.append(Door(layer, findData(layer["data"], data["tables"]["Obstacle"])))
+ 
+	global secrets
+	secrets = []
+	for layer in data["tables"]["Layer"]:
+		# print(layer["name"])
+		if Secret.isSecret(layer):
+			secrets.append(Secret(findData(layer["data"], data["tables"]["Wall"])))
+
+	# print(secrets)
+
+def findData(id, table):
+	out = [x for x in table if x['id'] == id]
+	if len(out) != 1:
+		raise Exception("A bad number of walls! "+str(len(out)))
+
+	return out[0]
 
 
 def createXML(output):
 	xmlString = xmlStart()
 	for wall in walls:
 		xmlString += wall.getXML()
+	for door in doors:
+		xmlString += door.getXML()
+	for secret in secrets:
+		# print(secret.getXML())
+		xmlString += secret.getXML()
 	xmlString += xmlEnd()
 
 	with open(output, "w") as file:
@@ -65,7 +93,7 @@ class Wall(object):
 		self.thickness = arg["thickness"]
 
 	def getSimpleXMLPoints(self, points):
-		return "<points>"+",".join(map(convertPoint, points))+"</points>"
+		return "<points>"+",".join(map(convertPoint, points))+"</points>\n"
 
 	def getXML(self):
 		if args.THICC:
@@ -84,13 +112,75 @@ class Wall(object):
 		occ = Occluder()
 		return occ.getXMLStart()+self.getSimpleXMLPoints(self.points)+occ.getXMLEnd()
 
+	@staticmethod
+	def isWall(layer):
+		return layer["name"].startswith("wall")
+
 def getRelativePoints(point):
 	return {'x': point['x'] - minX, 'y': maxY - point['y']}
 
 def convertPoint(pnt):
 	#move 0,0 to middle of the image and adjust from cell based to pixel based quardinates
-	return str((pnt['x'] - (maxX - minX) / 2) * args.RATIO)+","+str((pnt['y'] - (maxY - minY) / 2) * args.RATIO)
+	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2) * args.RATIO, (pnt['y'] - (maxY - minY) / 2) * args.RATIO)
 
+class Door(object):
+	"""docstring for Door"""
+	def __init__(self, layer, data):
+		super(Door, self).__init__()
+		#is it a double door
+		self.double = "double" in layer["name"]
+		#get angle in radians
+		self.angle = -data["angle"] / 180 * math.pi
+		self.scale = data["scale"]
+
+		self.position = addVector(getRelativePoints(data["begin"]), self.scale/2*math.sin(self.angle), -self.scale/2*math.cos(self.angle))#1 * math.sin(self.angle), 0.5 * math.cos(self.angle))
+		# print(self.position, data["angle"])
+
+	def getXMLPoints(self):
+		unit = self.scale / 2
+
+		a = unit * math.cos(self.angle)
+		b = unit * math.sin(self.angle)
+
+		if not self.double:
+			x = addVector(self.position, a, b)
+		else:
+			x = addVector(self.position, a*3, b*3)
+		box = makeBox(addVector(self.position, -a, -b), x, 0.1 * self.scale)
+		return "<points>"+",".join(map(convertPoint, box))+"</points>\n"
+
+	def getXML(self):
+		occ = Occluder()
+		return occ.getXMLStart()+self.getXMLPoints()+self.doorXMLtag()+occ.getXMLEnd()
+
+	def doorXMLtag(self):
+		return "<door>true</door>\n"
+
+	@staticmethod
+	def isDoor(layer):
+		return "door" in layer["name"]
+
+class Secret(Wall):
+	"""docstring for Secret"""
+	def __init__(self, arg):
+		super(Secret, self).__init__(arg)
+
+	def getXML(self):
+		result = ""
+		for a,b in pairwise(self.points):
+			occ = Occluder()
+			result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness/10))+self.doorXMLtag()+occ.getXMLEnd()
+		return result
+
+	# def getXMLEnd(self):
+	# 	return self.doorXMLtag() + super(Secret, self).getXMLEnd()
+
+	def doorXMLtag(self):
+		return "<secret>true</secret>\n"
+
+	@staticmethod
+	def isSecret(layer):
+		return layer["name"].startswith("secret") or layer["name"].startswith("Secret")
 
 class Occluder(object):
 	ID = 1
@@ -104,7 +194,7 @@ class Occluder(object):
 		return f"<occluder>\n<id>{self.id}</id>\n"
 
 	def getXMLEnd(self):
-		return "\n</occluder>\n"
+		return "</occluder>\n"
 
 	# def getXML(self, points):
 	# 	pass
@@ -130,12 +220,10 @@ def addVector(point, x, y):
 	return {'x':point['x'] + x, 'y':point['y'] + y}
 
 def pairwise(iterable):
+    #s -> (s0,s1), (s1,s2), (s2, s3), ...
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)  
-
-def isWall(layer):
-	return "wall" in layer["name"]
 
 minX = None
 maxX = None
