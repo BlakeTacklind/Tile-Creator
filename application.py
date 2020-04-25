@@ -52,11 +52,9 @@ def readDPS(filename):
 	global secrets
 	secrets = []
 	for layer in data["tables"]["Layer"]:
-		# print(layer["name"])
 		if Secret.isSecret(layer):
 			secrets.append(Secret(findData(layer["data"], data["tables"]["Wall"])))
 
-	# print(secrets)
 
 def findData(id, table):
 	out = [x for x in table if x['id'] == id]
@@ -73,7 +71,6 @@ def createXML(output):
 	for door in doors:
 		xmlString += door.getXML()
 	for secret in secrets:
-		# print(secret.getXML())
 		xmlString += secret.getXML()
 	xmlString += xmlEnd()
 
@@ -133,8 +130,7 @@ class Door(object):
 		self.angle = -data["angle"] / 180 * math.pi
 		self.scale = data["scale"]
 
-		self.position = addVector(getRelativePoints(data["begin"]), self.scale/2*math.sin(self.angle), -self.scale/2*math.cos(self.angle))#1 * math.sin(self.angle), 0.5 * math.cos(self.angle))
-		# print(self.position, data["angle"])
+		self.position = addVector(getRelativePoints(data["begin"]), self.scale/2*math.sin(self.angle), -self.scale/2*math.cos(self.angle))
 
 	def getXMLPoints(self):
 		unit = self.scale / 2
@@ -172,9 +168,6 @@ class Secret(Wall):
 			result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness/10))+self.doorXMLtag()+occ.getXMLEnd()
 		return result
 
-	# def getXMLEnd(self):
-	# 	return self.doorXMLtag() + super(Secret, self).getXMLEnd()
-
 	def doorXMLtag(self):
 		return "<secret>true</secret>\n"
 
@@ -196,15 +189,11 @@ class Occluder(object):
 	def getXMLEnd(self):
 		return "</occluder>\n"
 
-	# def getXML(self, points):
-	# 	pass
-
 def makeBox(pointA, pointB, thickness=0.1):
 	#make a box from a vector
 	#https://math.stackexchange.com/questions/60336/how-to-find-a-rectangle-which-is-formed-from-the-lines
 
 	dist = math.sqrt(math.pow(pointB['x'] - pointA['x'], 2) + math.pow(pointB['y'] - pointA['y'], 2))
-	# normal = (pointB['y'] - pointA['y'], pointA['x'] - pointB['x'])
 	ajustmentX = (pointB['y'] - pointA['y']) / dist * thickness
 	ajustmentY = (pointA['x'] - pointB['x']) / dist * thickness
 
