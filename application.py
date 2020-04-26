@@ -101,8 +101,11 @@ class Wall(object):
 	def getComplexXML(self):
 		result = ""
 		for a,b in pairwise(self.points):
+			# try:
 			occ = Occluder()
-			result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness/10))+occ.getXMLEnd()
+			box = makeBox(a, b, self.thickness/10)
+			if box:
+				result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness/10))+occ.getXMLEnd()
 		return result
 
 	def getSimpleXML(self):
@@ -141,7 +144,11 @@ class Door(object):
 		if not self.double:
 			x = addVector(self.position, a, b)
 		else:
+			#double doors just extend out in one direction
+			#since vector (a,b) is a half the lenth of a
+			#single door, triple it
 			x = addVector(self.position, a*3, b*3)
+
 		box = makeBox(addVector(self.position, -a, -b), x, 0.1 * self.scale)
 		return "<points>"+",".join(map(convertPoint, box))+"</points>\n"
 
@@ -194,6 +201,8 @@ def makeBox(pointA, pointB, thickness=0.1):
 	#https://math.stackexchange.com/questions/60336/how-to-find-a-rectangle-which-is-formed-from-the-lines
 
 	dist = math.sqrt(math.pow(pointB['x'] - pointA['x'], 2) + math.pow(pointB['y'] - pointA['y'], 2))
+	if dist == 0:
+		return []
 	ajustmentX = (pointB['y'] - pointA['y']) / dist * thickness
 	ajustmentY = (pointA['x'] - pointB['x']) / dist * thickness
 
