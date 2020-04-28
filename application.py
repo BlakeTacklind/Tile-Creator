@@ -13,7 +13,11 @@ def main():
 	parser.add_argument("-t", dest="THICC", action='store_const', default=True,
 		const=False, help="Make walls a single line thin")
 	parser.add_argument("-p", dest="PP", action='store_const', default=False,
-		const=True, help="Just pretty print json")
+		const=True, help="Just pretty print json (for debugging)")
+	parser.add_argument("-x", dest="SHIFT_X", default=0, type=int,
+		help="Shift the placement of items in the x direction by n pixels")
+	parser.add_argument("-y", dest="SHIFT_Y", default=0, type=int,
+		help="Shift the placement of items in the y direction by n pixels")
 	global args
 	args = parser.parse_args()
 
@@ -101,7 +105,6 @@ class Wall(object):
 	def getComplexXML(self):
 		result = ""
 		for a,b in pairwise(self.points):
-			# try:
 			occ = Occluder()
 			box = makeBox(a, b, self.thickness/10)
 			if box:
@@ -121,7 +124,7 @@ def getRelativePoints(point):
 
 def convertPoint(pnt):
 	#move 0,0 to middle of the image and adjust from cell based to pixel based quardinates
-	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2) * args.RATIO, (pnt['y'] - (maxY - minY) / 2) * args.RATIO)
+	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2) * args.RATIO + args.SHIFT_X, (pnt['y'] - (maxY - minY) / 2) * args.RATIO + args.SHIFT_Y)
 
 class Door(object):
 	"""docstring for Door"""

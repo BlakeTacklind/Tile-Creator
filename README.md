@@ -20,6 +20,7 @@ In order for it to work it looks at layer names. Starting a layer with `wall` (w
 
 * Walls under doors are still walls. Remove the wall that is directly underneath it or rename it to not start with `wall`
 * It's dumb software, something like the layer name `corridoor` has `door` and will try to create a door LOS
+* I have occasionally seen the definition somewhat shifted. Use `-x` and `-y` options to fix it in these cases
 
 ## Future Work
 
