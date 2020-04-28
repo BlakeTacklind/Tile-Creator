@@ -1,6 +1,6 @@
 # Tile-Creator
 
-This creates a xml to be used in [Fantasy Grounds Unity](https://www.fantasygrounds.com/home/FantasyGroundsUnity.php) from the save file from [dungeon painter](http://pyromancers.com/dungeon-painter-online/)
+This creates a xml to be used in [Fantasy Grounds Unity](https://www.fantasygrounds.com/home/FantasyGroundsUnity.php) from the save file from [Dungeon Painter (Steam)](http://store.steampowered.com/app/592260)
 
 ## Usage
 
