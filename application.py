@@ -14,6 +14,8 @@ def main():
 		const=False, help="Make walls a single line thin")
 	parser.add_argument("-p", dest="PP", action='store_const', default=False,
 		const=True, help="Just pretty print json (for debugging)")
+	parser.add_argument("--trees", dest="TREES", action='store_const', default=False,
+		const=True, help="Find and create terrain around trees")
 	parser.add_argument("-x", dest="SHIFT_X", default=0, type=int,
 		help="Shift the placement of items in the x direction by n pixels")
 	parser.add_argument("-y", dest="SHIFT_Y", default=0, type=int,
@@ -59,6 +61,14 @@ def readDPS(filename):
 		if Secret.isSecret(layer):
 			secrets.append(Secret(findData(layer["data"], data["tables"]["Wall"])))
 
+	global trees
+	trees = []
+	for layer in data["tables"]["Layer"]:
+		if RoundTerrain.isRound(layer):
+			trees.append(RoundTerrain(layer, findData(layer["data"], data["tables"]["Obstacle"])))
+
+	# for t in trees:
+	# 	print(t)
 
 def findData(id, table):
 	out = [x for x in table if x['id'] == id]
@@ -76,6 +86,8 @@ def createXML(output):
 		xmlString += door.getXML()
 	for secret in secrets:
 		xmlString += secret.getXML()
+	for tree in trees:
+		xmlString += tree.getXML()
 	xmlString += xmlEnd()
 
 	with open(output, "w") as file:
@@ -184,6 +196,77 @@ class Secret(Wall):
 	@staticmethod
 	def isSecret(layer):
 		return layer["name"].startswith("secret") or layer["name"].startswith("Secret")
+
+class RoundTerrain(object):
+	"""docstring for RoundTerrain"""
+	def __init__(self, layer, data):
+		self.small = "small" in layer["name"]
+		self.mid = "mid" in layer["name"]
+		self.big = "big" in layer["name"]
+		self.angle = -data["angle"] / 180 * math.pi
+		self.scale = data["scale"]
+
+		if self.mid:
+			v = {'x': self.scale / 2, 'y': self.scale / 2}
+			v = rotateVector(v, self.angle)
+			self.position = getRelativePoints(addVector((data["begin"]), v['x'], v['y']))
+		else:
+			self.position = getRelativePoints(data["begin"])
+
+	def getXML(self):
+		occ = Occluder()
+		return occ.getXMLStart()+self.getXMLPoints()+self.terrainXMLtag()+occ.getXMLEnd()
+
+	def terrainXMLtag(self):
+		return "<terrain>true</terrain>\n"
+
+	def getXMLPoints(self):
+		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
+
+	def makeShape(self):
+		dist = self.scale / 2
+
+		if self.small:
+			dist /= 2
+		if self.mid:
+			dist /= 1.5
+
+		vect = {'x':dist / 2, 'y':0}
+
+		points = []
+		steps = 8
+		for step in range(steps):
+			angle = 2 * math.pi / steps * step
+			v = rotateVector(vect, angle)
+			points.append(addVector(self.position, v['x'], v['y']))
+
+		return points
+
+	def __str__(self):
+		return self.getXML()
+
+		string = ""
+
+		if self.small:
+			string += "small "
+		if self.mid:
+			string += "middle "
+		if self.big:
+			string += "big "
+
+		string += str(self.position)
+
+		return string
+
+	@staticmethod
+	def isRound(layer):
+		return "tree" in layer["name"]
+
+def rotateVector(vect, angle):
+	return {
+		'x': math.cos(angle) * vect['x'] - math.sin(angle) * vect['y'],
+		'y': math.sin(angle) * vect['x'] + math.cos(angle) * vect['y']
+	}
 
 class Occluder(object):
 	ID = 1
