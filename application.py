@@ -13,8 +13,8 @@ def main():
 		help="output folder name. Just use the same basename")
 	parser.add_argument("-r", dest="RATIO", default=100,
 		help="set the number of pixels per square")
-	parser.add_argument("-t", dest="THICC", action='store_const', default=True,
-		const=False, help="Make walls a single line thin")
+	parser.add_argument("-t", dest="THICC", default=1, type=float,
+		help="change ratio of wall thickness. 0 is for just a line. 1 is for default thickness")
 	parser.add_argument("-p", dest="PP", action='store_const', default=False,
 		const=True, help="Just pretty print json (for debugging)")
 	parser.add_argument("--trees", dest="TREES", action='store_const', default=False,
@@ -28,6 +28,9 @@ def main():
 
 	if args.output is None and args.Folder is None:
 		raise Exception("Need either -o or -f option")
+
+	if args.THICC < 0:
+		raise Exception("thickness needs to be a positive number")
 
 	readDPS(args.input)
 
@@ -134,18 +137,18 @@ class Wall(object):
 		return "<points>"+",".join(map(convertPoint, points))+"</points>\n"
 
 	def getXML(self):
-		if args.THICC:
-			return self.getComplexXML()
-		else:
+		if args.THICC == 0:
 			return self.getSimpleXML()
+		else:
+			return self.getComplexXML()
 
 	def getComplexXML(self):
 		result = ""
 		for a,b in pairwise(self.points):
 			occ = Occluder()
-			box = makeBox(a, b, self.thickness/10)
+			box = makeBox(a, b, self.thickness / 10 * args.THICC)
 			if box:
-				result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness/10))+occ.getXMLEnd()
+				result += occ.getXMLStart()+self.getSimpleXMLPoints(box)+occ.getXMLEnd()
 		return result
 
 	def getSimpleXML(self):
@@ -189,7 +192,7 @@ class Door(object):
 			#single door, triple it
 			x = addVector(self.position, a*3, b*3)
 
-		box = makeBox(addVector(self.position, -a, -b), x, 0.1 * self.scale)
+		box = makeBox(addVector(self.position, -a, -b), x, 0.1 * self.scale * args.THICC)
 		return "<points>"+",".join(map(convertPoint, box))+"</points>\n"
 
 	def getXML(self):
@@ -212,7 +215,8 @@ class Secret(Wall):
 		result = ""
 		for a,b in pairwise(self.points):
 			occ = Occluder()
-			result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness/10))+self.doorXMLtag()+occ.getXMLEnd()
+			result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness / 10 * args.THICC))+\
+			self.doorXMLtag()+occ.getXMLEnd()
 		return result
 
 	def doorXMLtag(self):
