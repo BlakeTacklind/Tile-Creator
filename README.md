@@ -8,6 +8,8 @@ Create an image from dungeon painter. Add the image the image to your fantasy gr
 
 run `application.py <input dps> -o <output xml>` OR `application.py <input dps> -f <output directory>` (output directory such as relvant FGU asset folder)
 
+You can use the `-r <pixels>` for changing the number of pixels per square.
+
 Add the XML to asset folder. Make sure it have the same name as the image, excepting the extension. IE `Cool Map.png` and `Cool Map.xml`
 
 Now when adding that image to file to a map it should have LOS.
