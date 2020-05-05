@@ -3,11 +3,14 @@ import argparse
 import json
 import math
 import itertools
+import os
 
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("input", help="input DPS file")
-	parser.add_argument("output", help="output xml file")
+	parser.add_argument("-o", dest="output", help="output xml file")
+	parser.add_argument("-f", dest="Folder", type=str,
+		help="output folder name. Just use the same basename")
 	parser.add_argument("-r", dest="RATIO", default=100,
 		help="set the number of pixels per square")
 	parser.add_argument("-t", dest="THICC", action='store_const', default=True,
@@ -23,9 +26,22 @@ def main():
 	global args
 	args = parser.parse_args()
 
+	if args.output is None and args.Folder is None:
+		raise Exception("Need either -o or -f option")
+
 	readDPS(args.input)
 
-	createXML(args.output)
+	if args.output is not None:
+		createXML(args.output)
+
+	if args.Folder is not None:
+		#unclear why a the srting ends with a quote sometimes
+		if args.Folder.endswith("\""):
+			args.Folder = args.Folder[:-1]
+
+		dropped_extention = os.path.basename(args.input).split(".")[0]
+		output = os.path.join(args.Folder, dropped_extention)+".xml"
+		createXML(output)
 
 def readDPS(filename):
 	with open(filename) as file:
@@ -61,14 +77,18 @@ def readDPS(filename):
 		if Secret.isSecret(layer):
 			secrets.append(Secret(findData(layer["data"], data["tables"]["Wall"])))
 
-	global trees
-	trees = []
-	for layer in data["tables"]["Layer"]:
-		if RoundTerrain.isRound(layer):
-			trees.append(RoundTerrain(layer, findData(layer["data"], data["tables"]["Obstacle"])))
+	if args.TREES:
+		global trees
+		trees = []
+		for layer in data["tables"]["Layer"]:
+			if TreeTerrain.isRound(layer):
+				trees.append(TreeTerrain(layer, findData(layer["data"], data["tables"]["Obstacle"])))
 
-	# for t in trees:
-	# 	print(t)
+		global columns
+		columns = []
+		for layer in data["tables"]["Layer"]:
+			if Column.isRound(layer):
+				columns.append(Column(layer, findData(layer["data"], data["tables"]["Obstacle"])))
 
 def findData(id, table):
 	out = [x for x in table if x['id'] == id]
@@ -86,8 +106,13 @@ def createXML(output):
 		xmlString += door.getXML()
 	for secret in secrets:
 		xmlString += secret.getXML()
-	for tree in trees:
-		xmlString += tree.getXML()
+
+	if args.TREES:
+		for tree in trees:
+			xmlString += tree.getXML()
+		for column in columns:
+			xmlString += column.getXML()
+
 	xmlString += xmlEnd()
 
 	with open(output, "w") as file:
@@ -197,8 +222,8 @@ class Secret(Wall):
 	def isSecret(layer):
 		return layer["name"].startswith("secret") or layer["name"].startswith("Secret")
 
-class RoundTerrain(object):
-	"""docstring for RoundTerrain"""
+class TreeTerrain(object):
+	"""docstring for TreeTerrain"""
 	def __init__(self, layer, data):
 		self.small = "small" in layer["name"]
 		self.mid = "mid" in layer["name"]
@@ -207,6 +232,8 @@ class RoundTerrain(object):
 		self.scale = data["scale"]
 
 		if self.mid:
+			#middle sized trees have their center point offset from the
+			#image's center
 			v = {'x': self.scale / 2, 'y': self.scale / 2}
 			v = rotateVector(v, self.angle)
 			self.position = getRelativePoints(addVector((data["begin"]), v['x'], v['y']))
@@ -231,36 +258,48 @@ class RoundTerrain(object):
 		if self.mid:
 			dist /= 1.5
 
-		vect = {'x':dist / 2, 'y':0}
-
-		points = []
-		steps = 8
-		for step in range(steps):
-			angle = 2 * math.pi / steps * step
-			v = rotateVector(vect, angle)
-			points.append(addVector(self.position, v['x'], v['y']))
-
-		return points
-
-	def __str__(self):
-		return self.getXML()
-
-		string = ""
-
-		if self.small:
-			string += "small "
-		if self.mid:
-			string += "middle "
-		if self.big:
-			string += "big "
-
-		string += str(self.position)
-
-		return string
+		return drawCircle(self.position, dist/2)
 
 	@staticmethod
 	def isRound(layer):
 		return "tree" in layer["name"]
+
+class Column(object):
+	"""docstring for Column"""
+	def __init__(self, layer, data):
+		self.angle = -data["angle"] / 180 * math.pi
+		self.scale = data["scale"]
+
+		self.position = getRelativePoints(data["begin"])
+
+	def getXML(self):
+		occ = Occluder()
+		return occ.getXMLStart()+self.getXMLPoints()+occ.getXMLEnd()
+
+	def getXMLPoints(self):
+		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
+
+	def makeShape(self):
+		return drawCircle(self.position, self.scale / 2, close=True)
+
+	@staticmethod
+	def isRound(layer):
+		return "column" in layer["name"]
+
+def drawCircle(point, radius, steps=8, close=False):
+	vect = {'x':radius, 'y':0}
+
+	points = []
+	for step in range(steps):
+		angle = 2 * math.pi / steps * step
+		v = rotateVector(vect, angle)
+		points.append(addVector(point, v['x'], v['y']))
+
+	if close:
+		points.append(addVector(point, vect['x'], vect['y']))
+
+	return points
+
 
 def rotateVector(vect, angle):
 	return {
