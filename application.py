@@ -62,7 +62,7 @@ def readDPS(filename):
 	# get edges of map
 	getEdges(tables)
 
-	for layer in tables["Layer"]:
+	for layer in viableLayers(tables):
 		Wall.check(layer, tables)
 		Door.check(layer, tables)
 		Secret.check(layer, tables)
@@ -74,7 +74,40 @@ def readDPS(filename):
 		if args.TERRAIN:
 			Terrain.check(layer, tables)
 
+def viableLayers(tables):
+	#Genarate a sequence of layers that are not orphaned...
 
+	#1. find Root
+	try:
+		root = next(layer for layer in tables["Bunch"] if layer["name"] == "root" and layer["id"] == 1)
+	except StopIteration:
+		raise Exception("Could not find a root layer!!")
+
+	#recursively iterate on layers and bunches
+	for layer in processLayer(root["layers"], tables):
+		yield layer
+
+def processLayer(layers, tables):
+	for layer in layers:
+		bunch = findFirst(layer, tables["Bunch"])
+		sub = findFirst(layer, tables["Layer"])
+		if sub is not None:
+			if bunch is not None:
+				raise Exception("layer and bunch both exists!")
+			else:
+				yield sub
+		else:
+			if bunch is None:
+				raise Exception("Could not find layer")
+			else:
+				for l in processLayer(bunch["layers"], tables):
+					yield l
+
+def findFirst(id, table):
+	try:
+		return next(x for x in table if x['id'] == id)
+	except StopIteration:
+		return None
 
 def createXML(output):
 	xmlString = xmlStart()
@@ -175,7 +208,9 @@ def getRelativePoints(point):
 
 def convertPoint(pnt):
 	#move 0,0 to middle of the image and adjust from cell based to pixel based quardinates
-	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2) * args.RATIO + args.SHIFT_X, (pnt['y'] - (maxY - minY) / 2) * args.RATIO + args.SHIFT_Y)
+	middleX = int((maxX - minX) / 2)
+	middleY = int((maxY - minY) / 2)
+	return "{:.2f},{:.2f}".format((pnt['x'] - middleX) * args.RATIO + args.SHIFT_X, (pnt['y'] - middleY) * args.RATIO + args.SHIFT_Y)
 
 class Door(object):
 	doors=[]
