@@ -154,8 +154,9 @@ class Terrain(object):
 		return "<points>"+",".join(map(convertPoint, self.points))+"</points>\n"
 
 	def getXML(self):
-		occ = Occluder()
-		return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
+		occ = Occluder(self.points, terrain=True)
+		return occ.get()
+		# return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
 
 	@staticmethod
 	def check(layer):
@@ -180,15 +181,17 @@ class Wall(object):
 	def getComplexXML(self):
 		result = ""
 		for a,b in pairwise(self.points):
-			occ = Occluder()
 			box = makeBox(a, b, self.thickness / 10 * args.THICC)
 			if box:
-				result += occ.getXMLStart()+self.getSimpleXMLPoints(box)+occ.getXMLEnd()
+				occ = Occluder(box)
+				result += occ.get()
+				# result += occ.getXMLStart()+self.getSimpleXMLPoints(box)+occ.getXMLEnd()
 		return result
 
 	def getSimpleXML(self):
-		occ = Occluder()
-		return occ.getXMLStart()+self.getSimpleXMLPoints(self.points)+occ.getXMLEnd()
+		occ = Occluder(self.points)
+		return occ.get()
+		# return occ.getXMLStart()+self.getSimpleXMLPoints(self.points)+occ.getXMLEnd()
 
 	@staticmethod
 	def isWall(layer):
@@ -213,7 +216,7 @@ class Door(object):
 
 		self.position = addVector(getRelativePoints(data["begin"]), self.scale/2*math.sin(self.angle), -self.scale/2*math.cos(self.angle))
 
-	def getXMLPoints(self):
+	def getPoints(self):
 		unit = self.scale / 2
 
 		a = unit * math.cos(self.angle)
@@ -228,11 +231,13 @@ class Door(object):
 			x = addVector(self.position, a*3, b*3)
 
 		box = makeBox(addVector(self.position, -a, -b), x, 0.1 * self.scale * args.THICC)
-		return "<points>"+",".join(map(convertPoint, box))+"</points>\n"
+		return box
+		# return "<points>"+",".join(map(convertPoint, box))+"</points>\n"
 
 	def getXML(self):
-		occ = Occluder()
-		return occ.getXMLStart()+self.getXMLPoints()+self.doorXMLtag()+occ.getXMLEnd()
+		occ = Occluder(self.getPoints(), door=True)
+		return occ.get()
+		# return occ.getXMLStart()+self.getXMLPoints()+self.doorXMLtag()+occ.getXMLEnd()
 
 	def doorXMLtag(self):
 		return "<door>true</door>\n"
@@ -249,9 +254,10 @@ class Secret(Wall):
 	def getXML(self):
 		result = ""
 		for a,b in pairwise(self.points):
-			occ = Occluder()
-			result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness / 10 * args.THICC))+\
-			self.doorXMLtag()+occ.getXMLEnd()
+			occ = Occluder(makeBox(a, b, self.thickness / 10 * args.THICC), secret = True)
+			# result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness / 10 * args.THICC))+\
+			# self.doorXMLtag()+occ.getXMLEnd()
+			result += occ.get()
 		return result
 
 	def doorXMLtag(self):
@@ -280,8 +286,9 @@ class TreeTerrain(object):
 			self.position = getRelativePoints(data["begin"])
 
 	def getXML(self):
-		occ = Occluder()
-		return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
+		occ = Occluder(self.makeShape(), terrain = True)
+		return occ.get()
+		# return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
 
 	def getXMLPoints(self):
 		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
@@ -312,8 +319,9 @@ class Column(object):
 		self.position = getRelativePoints(data["begin"])
 
 	def getXML(self):
-		occ = Occluder()
-		return occ.getXMLStart()+self.getXMLPoints()+occ.getXMLEnd()
+		occ = Occluder(self.makeShape())
+		return occ.get()
+		# return occ.getXMLStart()+self.getXMLPoints()+occ.getXMLEnd()
 
 	def getXMLPoints(self):
 		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
@@ -349,13 +357,37 @@ def rotateVector(vect, angle):
 class Occluder(object):
 	ID = 1
 	"""docstring for Occluder"""
-	def __init__(self):
+	def __init__(self, points, terrain=False, door=False, secret=False):
 		super(Occluder, self).__init__()
+		self.points = points
+
+		self.terrain = terrain
+		self.door = door
+		self.secret = secret
+
 		self.id = Occluder.ID
 		Occluder.ID += 1
 
+	def get(self):
+		return self.getXMLStart() + self.pointsToXML() + self.extraTag() + self.getXMLEnd()
+
 	def getXMLStart(self):
 		return f"<occluder>\n<id>{self.id}</id>\n"
+
+	def pointsToXML(self):
+		return "<points>"+",".join(map(convertPoint, self.points))+"</points>\n"
+
+	def extraTag(self):
+		#there should be at most one extra tag right?
+
+		if self.terrain:
+			return "<terrain>true</terrain>\n"
+		if self.door:
+			return "<door>true</door>\n"
+		if self.secret:
+			return "<secret>true</secret>\n"
+
+		return ""
 
 	def getXMLEnd(self):
 		return "</occluder>\n"
