@@ -282,7 +282,7 @@ class TreeTerrain(object):
 		self.small = "small" in layer["name"]
 		self.mid = "mid" in layer["name"]
 		self.big = "big" in layer["name"]
-		self.angle = -data["angle"] / 180 * math.pi
+		self.angle = data["angle"] / 180 * math.pi
 		self.scale = data["scale"]
 
 		if self.mid:
