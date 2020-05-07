@@ -19,6 +19,8 @@ def main():
 		const=True, help="Just pretty print json (for debugging)")
 	parser.add_argument("--trees", dest="TREES", action='store_const', default=False,
 		const=True, help="Find and create terrain around trees")
+	parser.add_argument("--terrain", dest="TERRAIN", action='store_const', default=False,
+		const=True, help="Find and create terrain")
 	parser.add_argument("-x", dest="SHIFT_X", default=0, type=int,
 		help="Shift the placement of items in the x direction by n pixels")
 	parser.add_argument("-y", dest="SHIFT_Y", default=0, type=int,
@@ -56,11 +58,7 @@ def readDPS(filename):
 		exit(0)
 
 	# get edges of map
-	for objectTypes in data["tables"]:
-		for obj in data["tables"][objectTypes]:
-			if "points" in obj:
-				for point in obj["points"]:
-					updatePoints(point)
+	getEdges(data["tables"])
 
 	global walls
 	walls = []
@@ -93,12 +91,28 @@ def readDPS(filename):
 			if Column.isRound(layer):
 				columns.append(Column(layer, findData(layer["data"], data["tables"]["Obstacle"])))
 
+	if args.TERRAIN:
+		global terrain
+		terrain = []
+		for layer in data["tables"]["Layer"]:
+			if Terrain.check(layer):
+				terrain.append(Terrain(layer, getFigure(layer["data"], data["tables"])))
+
+
 def findData(id, table):
 	out = [x for x in table if x['id'] == id]
 	if len(out) != 1:
 		raise Exception("A bad number of walls! "+str(len(out)))
 
 	return out[0]
+
+def getFigure(id, tables):
+	res = findData(id, tables["Polygon"])["figures"]
+
+	if len(res) != 1:
+		raise Exception("More then 1 figure")
+
+	return findData(res[0], tables["Figure"])
 
 
 def createXML(output):
@@ -116,6 +130,10 @@ def createXML(output):
 		for column in columns:
 			xmlString += column.getXML()
 
+	if args.TERRAIN:
+		for ter in terrain:
+			xmlString += ter.getXML()
+
 	xmlString += xmlEnd()
 
 	with open(output, "w") as file:
@@ -125,6 +143,23 @@ def xmlStart():
 	return "<root>\n<occluders>\n"
 def xmlEnd():
 	return "</occluders>\n</root>\n"
+
+class Terrain(object):
+	"""docstring for Terrain"""
+	def __init__(self, layer, data):
+		super(Terrain, self).__init__()
+		self.points = data["points"]
+
+	def getXMLPoints(self):
+		return "<points>"+",".join(map(convertPoint, self.points))+"</points>\n"
+
+	def getXML(self):
+		occ = Occluder()
+		return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
+
+	@staticmethod
+	def check(layer):
+		return layer["name"].startswith("terrain")
 
 class Wall(object):
 	"""docstring for Wall"""
@@ -164,7 +199,7 @@ def getRelativePoints(point):
 
 def convertPoint(pnt):
 	#move 0,0 to middle of the image and adjust from cell based to pixel based quardinates
-	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2) * args.RATIO + args.SHIFT_X, (pnt['y'] - (maxY - minY) / 2) * args.RATIO + args.SHIFT_Y)
+	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2 - minX) * args.RATIO + args.SHIFT_X, (pnt['y'] - (maxY - minY) / 2 - minY) * args.RATIO + args.SHIFT_Y)
 
 class Door(object):
 	"""docstring for Door"""
@@ -246,10 +281,7 @@ class TreeTerrain(object):
 
 	def getXML(self):
 		occ = Occluder()
-		return occ.getXMLStart()+self.getXMLPoints()+self.terrainXMLtag()+occ.getXMLEnd()
-
-	def terrainXMLtag(self):
-		return "<terrain>true</terrain>\n"
+		return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
 
 	def getXMLPoints(self):
 		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
@@ -267,6 +299,9 @@ class TreeTerrain(object):
 	@staticmethod
 	def isRound(layer):
 		return "tree" in layer["name"]
+
+def terrainXMLtag():
+	return "<terrain>true</terrain>\n"
 
 class Column(object):
 	"""docstring for Column"""
@@ -352,13 +387,34 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, b)  
 
+def getEdges(tables):
+	#get a of figures that define polygons
+	availibleFigures = set()
+	for poly in tables["Polygon"]:
+		availibleFigures |= set(poly["figures"])
+
+	for objectTypes in tables:
+		#some items in figure table are no longer
+		#in use. Ignore them
+		if objectTypes == "Figure":
+			for obj in tables[objectTypes]:
+				if obj["id"] in availibleFigures:
+					checkPoints(obj)
+		else:
+			for obj in tables[objectTypes]:
+				checkPoints(obj)
+
 minX = None
 maxX = None
 minY = None
 maxY = None
 
+def checkPoints(obj):
+	if "points" in obj:
+		for point in obj["points"]:
+			updatePoints(point)
+
 def updatePoints(point):
-	# print(point)
 	global minX, maxX, minY, maxY
 	minX = minSpecial(minX, point['x'])
 	minY = minSpecial(minY, point['y'])
