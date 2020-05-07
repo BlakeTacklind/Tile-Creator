@@ -11,7 +11,7 @@ def main():
 	parser.add_argument("-o", dest="output", help="output xml file")
 	parser.add_argument("-f", dest="Folder", type=str,
 		help="output folder name. Just use the same basename")
-	parser.add_argument("-r", dest="RATIO", default=100,
+	parser.add_argument("-r", dest="RATIO", default=100, type=int,
 		help="set the number of pixels per square")
 	parser.add_argument("-t", dest="THICC", default=1, type=float,
 		help="change ratio of wall thickness. 0 is for just a line. 1 is for default thickness")
@@ -20,7 +20,7 @@ def main():
 	parser.add_argument("--trees", dest="TREES", action='store_const', default=False,
 		const=True, help="Find and create terrain around trees")
 	parser.add_argument("--terrain", dest="TERRAIN", action='store_const', default=False,
-		const=True, help="Find and create terrain")
+		const=True, help="Find and create terrain (incomplete - only works with polygons)")
 	parser.add_argument("-x", dest="SHIFT_X", default=0, type=int,
 		help="Shift the placement of items in the x direction by n pixels")
 	parser.add_argument("-y", dest="SHIFT_Y", default=0, type=int,
@@ -59,7 +59,9 @@ def readDPS(filename):
 
 	tables = data["tables"]
 
-	# get edges of map
+	#TODO Remove getEdges Function and getRelativePoints
+	#function. Do all space transformations in convertPoint
+	#get edges of map
 	getEdges(tables)
 
 	for layer in viableLayers(tables):

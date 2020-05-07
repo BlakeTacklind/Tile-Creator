@@ -6,17 +6,15 @@ This creates a xml to be used in [Fantasy Grounds Unity](https://www.fantasygrou
 
 Create an image from dungeon painter. Add the image the image to your fantasy grounds assets folder. Save the file from dungeon painter.
 
-run `application.py <input dps> -o <output xml>` OR `application.py <input dps> -f <output directory>` (output directory such as relvant FGU asset folder)
+run `application.py <input dps> -o <output xml>` OR `application.py <input dps> -f <output directory>` (output directory such as relevant FGU asset folder)
 
 Add the XML to asset folder. Make sure it have the same name as the image, excepting the extension. IE `Cool Map.png` and `Cool Map.xml`
 
 Now when adding that image to file to a map it should have LOS.
 
-You can use the `-r <pixels>` for changing the number of pixels per square.
+You can use the `-r <pixels>` for changing the number of pixels per square. Default is 100
 
-Use `--trees` option to add trees as terrain and columns as walls.
-
-Change wall thickness ratio with the `-t` option.
+Use `-h` for full list of options. Some functionality is incomplete or barely tested.
 
 ## What's a what?
 
@@ -28,9 +26,11 @@ Trees are using their default names. Using `tree` in the name makes it a tree. `
 
 * Walls under doors are still walls. Remove the wall that is directly underneath it or rename it to not start with `wall`
 * It's dumb software, something like the layer name `corridoor` has `door` and will try to create a door LOS
-* I have occasionally seen the definition somewhat shifted. Use `-x` and `-y` options to fix it in these cases
+* (fixed?) I have occasionally seen the definition somewhat shifted. Use `-x` and `-y` options to fix it in these cases
 
 ## Future Work
 
-* Create terrain
-* CLEAN THE CODE
+* Create terrain more completely
+* Clean up and organize code
+* Unit tests...
+* Walls that edge in on doors
