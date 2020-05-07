@@ -57,81 +57,43 @@ def readDPS(filename):
 		prettyPrint(data)
 		exit(0)
 
+	tables = data["tables"]
+
 	# get edges of map
-	getEdges(data["tables"])
+	getEdges(tables)
 
-	global walls
-	walls = []
-	for layer in data["tables"]["Layer"]:
-		if Wall.isWall(layer):
-			walls.append(Wall(findData(layer["data"], data["tables"]["Wall"])))
+	for layer in tables["Layer"]:
+		Wall.check(layer, tables)
+		Door.check(layer, tables)
+		Secret.check(layer, tables)
 
-	global doors
-	doors = []
-	for layer in data["tables"]["Layer"]:
-		if Door.isDoor(layer):
-			doors.append(Door(layer, findData(layer["data"], data["tables"]["Obstacle"])))
- 
-	global secrets
-	secrets = []
-	for layer in data["tables"]["Layer"]:
-		if Secret.isSecret(layer):
-			secrets.append(Secret(findData(layer["data"], data["tables"]["Wall"])))
+		if args.TREES:
+			TreeTerrain.check(layer, tables)
+			Column.check(layer, tables)
 
-	if args.TREES:
-		global trees
-		trees = []
-		for layer in data["tables"]["Layer"]:
-			if TreeTerrain.isRound(layer):
-				trees.append(TreeTerrain(layer, findData(layer["data"], data["tables"]["Obstacle"])))
+		if args.TERRAIN:
+			Terrain.check(layer, tables)
 
-		global columns
-		columns = []
-		for layer in data["tables"]["Layer"]:
-			if Column.isRound(layer):
-				columns.append(Column(layer, findData(layer["data"], data["tables"]["Obstacle"])))
-
-	if args.TERRAIN:
-		global terrain
-		terrain = []
-		for layer in data["tables"]["Layer"]:
-			if Terrain.check(layer):
-				terrain.append(Terrain(layer, getFigure(layer["data"], data["tables"])))
-
-
-def findData(id, table):
-	out = [x for x in table if x['id'] == id]
-	if len(out) != 1:
-		raise Exception("A bad number of walls! "+str(len(out)))
-
-	return out[0]
-
-def getFigure(id, tables):
-	res = findData(id, tables["Polygon"])["figures"]
-
-	if len(res) != 1:
-		raise Exception("More then 1 figure")
-
-	return findData(res[0], tables["Figure"])
 
 
 def createXML(output):
 	xmlString = xmlStart()
-	for wall in walls:
+
+	for wall in Wall.walls:
 		xmlString += wall.getXML()
-	for door in doors:
+	for door in Door.doors:
 		xmlString += door.getXML()
-	for secret in secrets:
+	for secret in Secret.secrets:
 		xmlString += secret.getXML()
 
 	if args.TREES:
-		for tree in trees:
+		for tree in TreeTerrain.trees:
 			xmlString += tree.getXML()
-		for column in columns:
+		for column in Column.columns:
 			xmlString += column.getXML()
 
 	if args.TERRAIN:
-		for ter in terrain:
+		for ter in Terrain.terrain:
 			xmlString += ter.getXML()
 
 	xmlString += xmlEnd()
@@ -145,32 +107,37 @@ def xmlEnd():
 	return "</occluders>\n</root>\n"
 
 class Terrain(object):
+	terrain = []
 	"""docstring for Terrain"""
 	def __init__(self, layer, data):
 		super(Terrain, self).__init__()
-		self.points = data["points"]
-
-	def getXMLPoints(self):
-		return "<points>"+",".join(map(convertPoint, self.points))+"</points>\n"
+		self.points = list(map(getRelativePoints, data["points"]))
 
 	def getXML(self):
 		occ = Occluder(self.points, terrain=True)
 		return occ.get()
-		# return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
 
 	@staticmethod
-	def check(layer):
-		return layer["name"].startswith("terrain")
+	def check(layer, tables):
+		if layer["name"].startswith("terrain"):
+			Terrain.terrain.append(Terrain(layer, getFigure(layer["data"], tables)))
+
+def getFigure(id, tables):
+	res = findData(id, tables["Polygon"])["figures"]
+
+	if len(res) != 1:
+		raise Exception("Not exactly 1 figure")
+
+	return findData(res[0], tables["Figure"])
+
 
 class Wall(object):
+	walls = []
 	"""docstring for Wall"""
-	def __init__(self, arg):
+	def __init__(self, data):
 		super(Wall, self).__init__()
-		self.points = list(map(getRelativePoints, arg["points"]))
-		self.thickness = arg["thickness"]
-
-	def getSimpleXMLPoints(self, points):
-		return "<points>"+",".join(map(convertPoint, points))+"</points>\n"
+		self.points = list(map(getRelativePoints, data["points"]))
+		self.thickness = data["thickness"]
 
 	def getXML(self):
 		if args.THICC == 0:
@@ -185,26 +152,33 @@ class Wall(object):
 			if box:
 				occ = Occluder(box)
 				result += occ.get()
-				# result += occ.getXMLStart()+self.getSimpleXMLPoints(box)+occ.getXMLEnd()
 		return result
 
 	def getSimpleXML(self):
 		occ = Occluder(self.points)
 		return occ.get()
-		# return occ.getXMLStart()+self.getSimpleXMLPoints(self.points)+occ.getXMLEnd()
 
 	@staticmethod
-	def isWall(layer):
-		return layer["name"].startswith("wall")
+	def check(layer, tables):
+		if layer["name"].startswith("wall"):
+			Wall.walls.append(Wall(findData(layer["data"], tables["Wall"])))
+
+def findData(id, table):
+	out = [x for x in table if x['id'] == id]
+	if len(out) != 1:
+		raise Exception("Not exactly 1 object! "+str(len(out)))
+
+	return out[0]
 
 def getRelativePoints(point):
 	return {'x': point['x'] - minX, 'y': maxY - point['y']}
 
 def convertPoint(pnt):
 	#move 0,0 to middle of the image and adjust from cell based to pixel based quardinates
-	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2 - minX) * args.RATIO + args.SHIFT_X, (pnt['y'] - (maxY - minY) / 2 - minY) * args.RATIO + args.SHIFT_Y)
+	return "{:.2f},{:.2f}".format((pnt['x'] - (maxX - minX) / 2) * args.RATIO + args.SHIFT_X, (pnt['y'] - (maxY - minY) / 2) * args.RATIO + args.SHIFT_Y)
 
 class Door(object):
+	doors=[]
 	"""docstring for Door"""
 	def __init__(self, layer, data):
 		super(Door, self).__init__()
@@ -232,21 +206,18 @@ class Door(object):
 
 		box = makeBox(addVector(self.position, -a, -b), x, 0.1 * self.scale * args.THICC)
 		return box
-		# return "<points>"+",".join(map(convertPoint, box))+"</points>\n"
 
 	def getXML(self):
 		occ = Occluder(self.getPoints(), door=True)
 		return occ.get()
-		# return occ.getXMLStart()+self.getXMLPoints()+self.doorXMLtag()+occ.getXMLEnd()
-
-	def doorXMLtag(self):
-		return "<door>true</door>\n"
 
 	@staticmethod
-	def isDoor(layer):
-		return "door" in layer["name"]
+	def check(layer, tables):
+		if "door" in layer["name"]:
+			Door.doors.append(Door(layer, findData(layer["data"], tables["Obstacle"])))\
 
 class Secret(Wall):
+	secrets=[]
 	"""docstring for Secret"""
 	def __init__(self, arg):
 		super(Secret, self).__init__(arg)
@@ -255,19 +226,20 @@ class Secret(Wall):
 		result = ""
 		for a,b in pairwise(self.points):
 			occ = Occluder(makeBox(a, b, self.thickness / 10 * args.THICC), secret = True)
-			# result += occ.getXMLStart()+self.getSimpleXMLPoints(makeBox(a, b, self.thickness / 10 * args.THICC))+\
-			# self.doorXMLtag()+occ.getXMLEnd()
 			result += occ.get()
 		return result
-
-	def doorXMLtag(self):
-		return "<secret>true</secret>\n"
 
 	@staticmethod
 	def isSecret(layer):
 		return layer["name"].startswith("secret") or layer["name"].startswith("Secret")
 
+	@staticmethod
+	def check(layer, tables):
+		if Secret.isSecret(layer):
+			Secret.secrets.append(Secret(findData(layer["data"], tables["Wall"])))
+
 class TreeTerrain(object):
+	trees = []
 	"""docstring for TreeTerrain"""
 	def __init__(self, layer, data):
 		self.small = "small" in layer["name"]
@@ -288,10 +260,6 @@ class TreeTerrain(object):
 	def getXML(self):
 		occ = Occluder(self.makeShape(), terrain = True)
 		return occ.get()
-		# return occ.getXMLStart()+self.getXMLPoints()+terrainXMLtag()+occ.getXMLEnd()
-
-	def getXMLPoints(self):
-		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
 
 	def makeShape(self):
 		dist = self.scale / 2
@@ -304,16 +272,14 @@ class TreeTerrain(object):
 		return drawCircle(self.position, dist/2)
 
 	@staticmethod
-	def isRound(layer):
-		return "tree" in layer["name"]
-
-def terrainXMLtag():
-	return "<terrain>true</terrain>\n"
+	def check(layer, tables):
+		if "tree" in layer["name"]:
+			TreeTerrain.trees.append(TreeTerrain(layer, findData(layer["data"], tables["Obstacle"])))
 
 class Column(object):
+	columns = []
 	"""docstring for Column"""
 	def __init__(self, layer, data):
-		self.angle = -data["angle"] / 180 * math.pi
 		self.scale = data["scale"]
 
 		self.position = getRelativePoints(data["begin"])
@@ -321,17 +287,14 @@ class Column(object):
 	def getXML(self):
 		occ = Occluder(self.makeShape())
 		return occ.get()
-		# return occ.getXMLStart()+self.getXMLPoints()+occ.getXMLEnd()
-
-	def getXMLPoints(self):
-		return "<points>"+",".join(map(convertPoint, self.makeShape()))+"</points>\n"
 
 	def makeShape(self):
 		return drawCircle(self.position, self.scale / 2, close=True)
 
 	@staticmethod
-	def isRound(layer):
-		return "column" in layer["name"]
+	def check(layer, tables):
+		if "column" in layer["name"]:
+			Column.columns.append(Column(layer, findData(layer["data"], tables["Obstacle"])))
 
 def drawCircle(point, radius, steps=8, close=False):
 	vect = {'x':radius, 'y':0}
