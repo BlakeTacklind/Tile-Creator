@@ -6,7 +6,7 @@ This creates a xml to be used in [Fantasy Grounds Unity](https://www.fantasygrou
 
 Create an image from dungeon painter. Add the image the image to your fantasy grounds assets folder. Save the file from dungeon painter.
 
-run `application.py <input dps> -o <output xml>` OR `application.py <input dps> -f <output directory>` (output directory such as relevant FGU asset folder)
+run `application.py <input dps> -o <output xml>` OR `application.py <input dps> -f <output directory>` (output directory such as relevant FGU asset folder). This uses [Python 3](https://realpython.com/installing-python/) so you should have that installed, may require a `python3 ` before the `application.py` on certain systems.
 
 Add the XML to asset folder. Make sure it have the same name as the image, excepting the extension. IE `Cool Map.png` and `Cool Map.xml`
 
